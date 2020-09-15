@@ -44,7 +44,6 @@ func createConnection() *sql.DB {
 	}
 
 	err = db.Ping()
-
 	if err != nil {
 		panic(err)
 	}
@@ -152,11 +151,114 @@ func getAllUsers() ([]models.User, error) {
 
 }
 
+func UpdateUser(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Context-Type", "application/x-www-form-urlencoded")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "PUT")
+	w.Header().Set("Access-Control-Allow-Headers", "Contenet-Type")
+
+	params := mux.Vars(r)
+
+	id, err := strconv.Atoi(params["id"])
+
+	if err != nil {
+		log.Fatalf("Unable to convert the string into int. %v", err)
+	}
+
+	var user models.User
+
+	err = json.NewDecoder(r.Body).Decode(&user)
+
+	if err != nil {
+		log.Fatalf("Unable to decode the request body. %v", err)
+	}
+
+	updatedRows := updatingUser(int64(id), user)
+
+	msg := fmt.Sprintf("User updated successfully. Total record affected %v", updatedRows)
+
+	res := response{
+		ID:      int64(id),
+		Message: msg,
+	}
+
+	json.NewEncoder(w).Encode(res)
+
+}
+
+// update user in the DB
+func updatingUser(id int64, user models.User) int64 {
+	db := createConnection()
+	defer db.Close()
+
+	sqlQuery := `UPDATE users SET name=$2, location=$3, age=$4 WHERE userid=$1`
+
+	// execute the sql statement
+	res, err := db.Exec(sqlQuery, id, user.Name, user.Location, user.Age)
+	if err != nil {
+		log.Fatalf("Unable to execute the query. %v", err)
+	}
+
+	rowsAffected, err := res.RowsAffected()
+	if err != nil {
+		log.Fatalf("err while checking the affected rows. %v", err)
+	}
+
+	return rowsAffected
+}
+
+func DeleteUser(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Context-Type", "application/x-www-form-urlencoded")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "DELETE")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+	params := mux.Vars(r)
+
+	id, err := strconv.Atoi(params["id"])
+	if err != nil {
+		log.Fatalf("Unable to convert the string into int. %v", err)
+	}
+
+	deleteedRows := deletingUser(int64(id))
+
+	msg := fmt.Sprintf("User Updated Successfully. Total row(s) Affected %v", deleteedRows)
+
+	res := response{
+		ID:      int64(id),
+		Message: msg,
+	}
+
+	json.NewEncoder(w).Encode(res)
+}
+
+func deletingUser(id int64) int64 {
+	db := createConnection()
+
+	defer db.Close()
+
+	sqlQuery := `DELETE FROM users WHERE userid=$1`
+
+	res, err := db.Exec(sqlQuery, id)
+	resPrint := &res
+	fmt.Println("res=============", *resPrint)
+	if err != nil {
+		log.Fatalf("Unable to execute the query .%v", err)
+	}
+
+	rowsAffected, err := res.RowsAffected()
+	if err != nil {
+		log.Fatalf("Error while checking the affected rows. %v", err)
+	}
+
+	fmt.Println("Total row affected %v", rowsAffected)
+	return rowsAffected
+
+}
+
 func insertUser(user models.User) int64 {
 	//create the postgres db connection
 	db := createConnection()
-
-	fmt.Println(db, "dbconnected")
 
 	// close db
 	defer db.Close()
@@ -165,14 +267,9 @@ func insertUser(user models.User) int64 {
 	var id int64
 
 	err := db.QueryRow(sqlStatement, user.Name, user.Location, user.Age).Scan(&id)
-
 	if err != nil {
 		log.Fatalf("Unable to execute the query .%v", err)
-
 	}
 
-	fmt.Println("Inserted a single record %v", id)
-
-	// return id
 	return id
 }
